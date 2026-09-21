@@ -24,7 +24,7 @@ export function Chat({
       <CopilotChat
         agentId={agentId}
         threadId={threadId}
-        className="mx-auto h-full w-full max-w-3xl"
+        className="min-h-0 flex-1"
         labels={{
           chatInputPlaceholder: "Add something to the list…",
         }}

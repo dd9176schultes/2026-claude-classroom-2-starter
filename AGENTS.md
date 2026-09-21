@@ -54,6 +54,7 @@ AI tutoring web app on Next.js 16 App Router + React 19 + Tailwind v4: a Mastra 
 - Thread ids are `tutor:<userId>` (`tutorThreadId`), rendered into the page from the session so a reload rejoins the same conversation; a forged one fails on Mastra's `AGENT_MEMORY_THREAD_RESOURCE_MISMATCH`, which is what actually keeps user A out of user B's thread.
 - The route answers 401 before touching Mastra, and that is the only auth gate — the runtime endpoint is otherwise public.
 - Use `createCopilotRuntimeHandler` from `@copilotkit/runtime/v2`; the `v2/express` and `v2/hono` adapters the package also exports are for those servers, not a Next route handler.
+- `CopilotKit` wraps its children in a `display: contents` div, which Chromium will not resolve a percentage height through, so `h-full` on `CopilotChat` collapses to content height — `app/page.tsx` makes `main` a flex column and the chat fills it with `flex-1` instead.
 - `@copilotkit/react-core/v2` is the whole client surface (`CopilotKit`, `CopilotChat`, `styles.css`) — `@copilotkit/react-ui` and the package roots are v1 and do not work with it.
 - The CopilotKit Inspector is on by default in development (`enableInspector` stays unset; `showDevConsole` is deprecated and controls nothing). Its `<cpk-web-inspector>` launcher would sit on the header's sign-out button, so `app/globals.css` shifts the host down with a margin.
 - `OPENROUTER_BASE_URL` (optional, see `.env.example`) routes the model traffic through a local proxy; with a custom `url` Mastra's model router no longer reads `OPENROUTER_API_KEY` itself, which is why `lib/tutor.ts` passes `apiKey` explicitly.
@@ -76,6 +77,8 @@ AI tutoring web app on Next.js 16 App Router + React 19 + Tailwind v4: a Mastra 
 ## Styling — `app/globals.css`, `postcss.config.mjs`
 
 - Tailwind v4 has no `tailwind.config.*`; design tokens live in the `@theme inline` block of `globals.css`.
+- The app is light only: `globals.css` sets `color-scheme: light` and an `@custom-variant` repoints Tailwind's `dark:` variant at a `.dark` ancestor, so the `dark:` utilities still sitting in `components/` never match.
+- That is CopilotKit's own dark-mode hook — its stylesheet has no `prefers-color-scheme` rule anywhere — so putting `.dark` on `<html>` is what would turn the app and the chat over together, which following the OS did not.
 - The `body` rule in `globals.css` applies `--font-geist-sans` globally, so reach for a `font-mono` utility only where the mono face is actually wanted.
 
 ## Secrets — `.env`

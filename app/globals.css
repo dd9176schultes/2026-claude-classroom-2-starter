@@ -1,6 +1,17 @@
 @import "tailwindcss";
 
+/*
+ * Light only for now. CopilotKit's stylesheet carries no `prefers-color-scheme`
+ * rules and themes itself off a `.dark` ancestor instead, so following the OS
+ * turned the page dark and left the chat a white box on top of it. Tailwind's
+ * `dark:` variant is pointed at that same class, so the `dark:` utilities in
+ * components/ stay inert until something adds `.dark` — and when it does, the
+ * app and the chat turn over together.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
+  color-scheme: light;
   --background: #ffffff;
   --foreground: #171717;
 }
@@ -10,13 +21,6 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
