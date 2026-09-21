@@ -1,7 +1,4 @@
 // @vitest-environment node
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { betterAuth } from "better-auth";
 import { type TestHelpers, testUtils } from "better-auth/plugins";
 import { migrate } from "drizzle-orm/libsql/migrator";
@@ -11,9 +8,9 @@ import { afterAll, beforeAll, expect, test } from "vitest";
 import { authOptions } from "@/lib/auth-config";
 
 // The production instance in lib/auth.ts is `server-only` and bound to
-// DATABASE_URL, so this builds the same options over a throwaway file and adds
-// testUtils — the plugin array stays a literal so `ctx.test` keeps its types.
-let dir: string;
+// DATABASE_URL, so this builds the same options over an in-memory database and
+// adds testUtils — the plugin array stays a literal so `ctx.test` keeps its
+// types.
 let db: ReturnType<typeof drizzle>;
 let auth: ReturnType<typeof createTestAuth>;
 let helpers: TestHelpers;
@@ -30,17 +27,15 @@ function createTestAuth(database: ReturnType<typeof drizzle>) {
 }
 
 beforeAll(async () => {
-  dir = await mkdtemp(join(tmpdir(), "ai-tutor-auth-"));
-  db = drizzle({ connection: { url: `file:${join(dir, "auth.db")}` } });
+  db = drizzle({ connection: { url: ":memory:" } });
   await migrate(db, { migrationsFolder: "./drizzle" });
 
   auth = createTestAuth(db);
   helpers = (await auth.$context).test;
 });
 
-afterAll(async () => {
+afterAll(() => {
   db.$client.close();
-  await rm(dir, { recursive: true, force: true });
 });
 
 test("sign-up creates the user", async () => {

@@ -15,6 +15,13 @@
       "when": 1788258977489,
       "tag": "0001_boring_tarantula",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1789994853460,
+      "tag": "0002_yummy_snowbird",
+      "breakpoints": true
     }
   ]
 }

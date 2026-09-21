@@ -12,6 +12,10 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
   reporter: "list",
+  // `next dev` compiles each route on first request and the home page pulls in
+  // the whole CopilotKit client bundle, which outruns the 5s default assertion
+  // timeout on a cold .next-e2e.
+  expect: { timeout: 15_000 },
   use: {
     baseURL,
     trace: "on-first-retry",

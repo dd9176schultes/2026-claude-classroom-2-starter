@@ -23,6 +23,7 @@ AI tutoring web app on Next.js 16 App Router + React 19 + Tailwind v4: a Mastra 
 ## App code — `app/layout.tsx`, `app/page.tsx`, `components/`
 
 - `PageProps<'/route'>` and `LayoutProps<'/route'>` are globals generated into `.next/types`, so a typecheck on a clean checkout fails until `next dev` or `next build` has run once.
+- TypeScript 7 ships no JavaScript compiler API, so `next build` type-checks by running the project-local `tsc`; leave `experimental.useTypeScriptCli` unset, because `false` makes the build exit.
 - Import across the repo with the `@/*` alias (rooted at this directory), not deep relative paths.
 - `components/ui/` holds the presentational primitives (`auth-card`, `field`, `button`, `form-error`, `page-header`); extend one instead of repeating its class string.
 - `/` is the chat page: a Server Component that gates on the session, then renders `PageHeader` plus the client-only `components/chat.tsx`.
@@ -51,20 +52,21 @@ AI tutoring web app on Next.js 16 App Router + React 19 + Tailwind v4: a Mastra 
 - The route builds the AG-UI bridge per request with `MastraAgent.getLocalAgent({ resourceId: session.user.id })`, so memory is scoped by the verified user id and never by anything in the request.
 - Thread ids are `tutor:<userId>` (`tutorThreadId`), rendered into the page from the session so a reload rejoins the same conversation; a forged one fails on Mastra's `AGENT_MEMORY_THREAD_RESOURCE_MISMATCH`, which is what actually keeps user A out of user B's thread.
 - The route answers 401 before touching Mastra, and that is the only auth gate — the runtime endpoint is otherwise public.
-- Use `createCopilotRuntimeHandler` from `@copilotkit/runtime/v2`; the package's own `skills/runtime/` docs flag the Express and Hono adapters as "avoid at all costs".
+- Use `createCopilotRuntimeHandler` from `@copilotkit/runtime/v2`; the `v2/express` and `v2/hono` adapters the package also exports are for those servers, not a Next route handler.
 - `@copilotkit/react-core/v2` is the whole client surface (`CopilotKit`, `CopilotChat`, `styles.css`) — `@copilotkit/react-ui` and the package roots are v1 and do not work with it.
 - The CopilotKit Inspector is on by default in development (`enableInspector` stays unset; `showDevConsole` is deprecated and controls nothing). Its `<cpk-web-inspector>` launcher would sit on the header's sign-out button, so `app/globals.css` shifts the host down with a margin.
 - `OPENROUTER_BASE_URL` (optional, see `.env.example`) routes the model traffic through a local proxy; with a custom `url` Mastra's model router no longer reads `OPENROUTER_API_KEY` itself, which is why `lib/tutor.ts` passes `apiKey` explicitly.
 - Threads only persist inside Mastra's memory — the runtime runs on the default `InMemoryAgentRunner`, so the browser's own transcript still starts empty on reload.
-- `@copilotkit/runtime` drags in a zod-3 dependency tree that conflicts with Better Auth's zod 4, hence `.npmrc`'s `legacy-peer-deps=true`; drop it and `npm install` fails.
+- `@copilotkit/runtime` and AG-UI pull zod 3 while Better Auth pulls zod 4; npm nests the two copies on its own, so there is no `.npmrc` and no `legacy-peer-deps`.
+- `@ag-ui/client` and `@ag-ui/core` are direct dependencies only to satisfy `@ag-ui/mastra`'s peers, and have to stay on the exact version `@copilotkit/runtime` pins — a second copy turns the agent into a type error in `CopilotRuntime({ agents })`.
 
 ## Tests — `tests/unit` (Vitest), `tests/e2e` (Playwright)
 
 - Vitest is jsdom + Testing Library and only picks up `tests/unit/**/*.test.{ts,tsx}`; async Server Components are unsupported there, so cover those with e2e instead.
-- `vitest.config.mts` resolves `@/*` through `resolve.tsconfigPaths` — the `vite-tsconfig-paths` plugin the Next.js guide recommends is deprecated, so don't reinstall it.
+- `vitest.config.mts` resolves `@/*` through Vite's built-in `resolve.tsconfigPaths`, which supersedes the `vite-tsconfig-paths` plugin the Next.js guide still lists — don't reinstall it.
 - Playwright runs Chromium only against its own `next dev` on port 3100 (override with `E2E_PORT`).
 - `next dev` refuses to start twice against one dist dir, so `next.config.ts` reads `NEXT_DIST_DIR` and the e2e server sets it to `.next-e2e`; that dir also needs a `tsconfig.json` include entry, which `next dev` adds itself.
-- `tests/unit/db.test.ts` and `tests/unit/auth.test.ts` opt out of jsdom with a `// @vitest-environment node` first line and migrate a temp file, so they never touch `data/app.db`.
+- `tests/unit/db.test.ts` and `tests/unit/auth.test.ts` opt out of jsdom with a `// @vitest-environment node` first line and migrate a `:memory:` database, so they never touch `data/app.db` and leave nothing to clean up.
 - The auth test builds its own instance from `authOptions` with the `testUtils()` plugin and an explicit `secret`/`baseURL`, because Vitest does not load `.env`.
 - `tests/e2e/auth.spec.ts` does hit `data/app.db`, so it signs up a `Date.now()`-stamped email; `playwright.config.ts` also overrides `BETTER_AUTH_URL` onto its own port.
 - `tests/unit/copilotkit-route.test.ts` mocks `@/lib/auth`, `@/lib/tutor`, and both CopilotKit/AG-UI modules, so it covers the 401 gate and the `resourceId` wiring without a model call; nothing in the suite calls OpenRouter.
@@ -81,7 +83,8 @@ AI tutoring web app on Next.js 16 App Router + React 19 + Tailwind v4: a Mastra 
 
 ## Tooling — `biome.json`
 
-- Biome ignores `.claude/` because its vendored skill assets fail `biome check .`, and `drizzle/` because drizzle-kit's generated JSON does not match its formatter.
+- Biome ignores `.claude/` because its vendored skill assets fail `biome check .`, `drizzle/` because drizzle-kit's generated JSON does not match its formatter, and `public/` because it flags the stock `.svg` assets for a11y titles they do not need.
+- `.gitattributes` pins the working tree to `eol=lf`; Biome formats to LF and no `lineEnding` is configured, so a CRLF checkout fails `npm run lint` on every file.
 - `npm run format` skips assist actions such as import sorting; use `npx biome check --write <path>` to fix those.
 
 ## Maintenance — for you, the agent
