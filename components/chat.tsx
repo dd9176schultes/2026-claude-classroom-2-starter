@@ -1,12 +1,15 @@
 "use client";
 
-import { CopilotChat, CopilotKit } from "@copilotkit/react-core/v2";
-import "@copilotkit/react-core/v2/styles.css";
+import { CopilotChat } from "@copilotkit/react-core/v2";
+import { useTodoToolRenderers } from "@/components/todo-tool-renderers";
 
 /**
  * `threadId` is handed down from the server-rendered session rather than picked
  * here, so a reload rejoins the same Mastra thread instead of starting a new
  * one. See lib/tutor.ts for why a forged one is useless.
+ *
+ * The surrounding `CopilotKit` provider lives in components/workspace.tsx,
+ * because the sidebar's `useAgent` needs to sit inside it too.
  */
 export function Chat({
   agentId,
@@ -15,20 +18,19 @@ export function Chat({
   agentId: string;
   threadId: string;
 }) {
+  // Registration is global to the provider, but it belongs with the transcript
+  // these cards are drawn into.
+  useTodoToolRenderers();
+
   return (
-    // The Inspector is on by default in development builds and never loads in a
-    // production one, so `enableInspector` is left unset deliberately;
-    // `showDevConsole` is deprecated and no longer controls it either way.
-    // app/globals.css moves its launcher off the header's sign-out button.
-    <CopilotKit runtimeUrl="/api/copilotkit" credentials="include">
-      <CopilotChat
-        agentId={agentId}
-        threadId={threadId}
-        className="min-h-0 flex-1"
-        labels={{
-          chatInputPlaceholder: "Add something to the list…",
-        }}
-      />
-    </CopilotKit>
+    <CopilotChat
+      agentId={agentId}
+      threadId={threadId}
+      // Grows down the column its wrapper makes; see components/workspace.tsx.
+      className="min-h-0 flex-1"
+      labels={{
+        chatInputPlaceholder: "Add something to the list…",
+      }}
+    />
   );
 }

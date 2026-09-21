@@ -5,6 +5,12 @@ import { defineConfig, devices } from "@playwright/test";
 const PORT = Number(process.env.E2E_PORT ?? 3100);
 const baseURL = `http://localhost:${PORT}`;
 
+// Everything matching this is a model round-trip: real OpenRouter calls, real
+// money, and an answer that is only mostly deterministic. It is its own project
+// so `npm run test:e2e` can stay free and quick, and `npm run test:e2e:llm`
+// opts in.
+const LLM_SPECS = /\.llm\.spec\.ts$/;
+
 export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: true,
@@ -20,7 +26,23 @@ export default defineConfig({
     baseURL,
     trace: "on-first-retry",
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    {
+      name: "chromium",
+      testIgnore: LLM_SPECS,
+      use: { ...devices["Desktop Chrome"] },
+    },
+    {
+      name: "llm",
+      testMatch: LLM_SPECS,
+      use: { ...devices["Desktop Chrome"] },
+      // A butler who reads the list, adds an item and then composes a sentence
+      // about it is several round-trips deep before the assertion can pass.
+      timeout: 180_000,
+      expect: { timeout: 120_000 },
+      retries: 0,
+    },
+  ],
   webServer: {
     command: `npx next dev --port ${PORT}`,
     // Own dist dir (see next.config.ts) so this server's lock never collides

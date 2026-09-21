@@ -3,6 +3,8 @@ import { Agent } from "@mastra/core/agent";
 import { Mastra } from "@mastra/core/mastra";
 import { LibSQLStore } from "@mastra/libsql";
 import { Memory } from "@mastra/memory";
+import { db } from "@/lib/db";
+import { createTodoTools } from "@/lib/todo-tools";
 
 /** Registry key of the one agent, and the CopilotKit `agentId` on the client. */
 export const TUTOR_AGENT_ID = "tutor";
@@ -29,13 +31,29 @@ Manner:
 - Keep replies short. A butler informs; he does not lecture.
 
 Your duties, and nothing besides:
-- Add, amend, complete, reorder, and remove items on the user's to-do list.
+- Add items to the user's to-do list, and tick them off when they are done.
 - Read the list back, in whole or in part, and answer questions about what is on it.
 - Ask one brief clarifying question when an instruction is genuinely ambiguous.
 
-You hold the list in your memory of this conversation. It persists between visits, so
-recall what was already agreed rather than asking the user to repeat themselves. When you
-have changed the list, state plainly what now stands.
+The list lives in the household ledger, not in your memory of this conversation, and you
+reach it only through your tools:
+- listTodos reads the whole list. Consult it before answering any question about what
+  stands on the list, and never recite the list from recollection — the user has the same
+  ledger open beside this conversation, and an answer that disagrees with it is worse
+  than no answer at all.
+- addTodo puts one item on the list. One call per item: three errands are three calls.
+- setTodoDone ticks an item off, or restores it. It takes an id, which comes from
+  listTodos, so read the list first unless you already have the id to hand.
+
+Offer, once, and briefly:
+- When the user mentions something they mean to do but does not ask you to record it,
+  offer to put it on the list rather than doing so unbidden — "shall I add that to your
+  list?" — and add it if they agree.
+- When they mention having done something that stands on the list, offer to tick it off.
+- Offer once. If they decline, let it be.
+
+When you have changed the list, state plainly what now stands. If a tool reports that
+nothing was updated, say so rather than claiming the change was made.
 
 Refusals — this matters:
 - Any request that is not about this user's to-do list is outside your duties. That
@@ -52,9 +70,12 @@ Refusals — this matters:
 // connection lives inside the LibSQLStore, so the store is the one thing that
 // has to survive a reload (same reason as lib/db.ts); the Mastra instance and
 // the agent around it hold no connection of their own.
+//
+// Both branches below have to land on one type, or `mastra` is a union and
+// `mastra.getAgent` stops being callable at all.
 const globalForTutor = globalThis as typeof globalThis & {
   tutorStorage?: LibSQLStore;
-  mastra?: Mastra<{ [TUTOR_AGENT_ID]: Agent }>;
+  mastra?: ReturnType<typeof createMastra>;
 };
 
 function createStorage() {
@@ -88,6 +109,9 @@ function createMastra(storage: LibSQLStore) {
             apiKey: process.env.OPENROUTER_API_KEY,
           }),
         },
+        // Bound to the app's one connection; the user whose rows they touch
+        // arrives per request on the RequestContext, never on the tool call.
+        tools: createTodoTools(db),
         // The store is handed to both the instance and the Memory so neither
         // silently falls back to the non-durable in-memory one.
         memory: new Memory({ storage, options: { lastMessages: 40 } }),
